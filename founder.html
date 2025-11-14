@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suyash Rathod - Founder | BeatsVibe Technologies</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .founder-hero {
+            margin-top: 70px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding: 50px 20px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%);
+        }
+
+        .founder-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .founder-image {
+            position: relative;
+        }
+
+        .founder-image img {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 20px;
+            border: 3px solid var(--primary);
+            box-shadow: 0 20px 60px rgba(99, 102, 241, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .founder-image img:hover {
+            transform: scale(1.05);
+            box-shadow: 0 30px 80px rgba(99, 102, 241, 0.5);
+        }
+
+        .founder-info h1 {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #fff 0%, var(--primary) 50%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .founder-title {
+            font-size: 1.4rem;
+            color: var(--primary);
+            margin-bottom: 2rem;
+            font-weight: 600;
+        }
+
+        .founder-bio {
+            color: #cbd5e1;
+            font-size: 1.1rem;
+            line-height: 1.8;
+            margin-bottom: 2rem;
+        }
+
+        .founder-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05));
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #cbd5e1;
+            font-size: 0.95rem;
+        }
+
+        .founder-skills {
+            margin-top: 3rem;
+        }
+
+        .founder-skills h3 {
+            color: #fff;
+            margin-bottom: 1.5rem;
+        }
+
+        .skills-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .skill-tag {
+            background: rgba(99, 102, 241, 0.2);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 0.7rem 1.5rem;
+            border-radius: 25px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .skill-tag:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-3px);
+        }
+
+        .founder-social {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .founder-social a {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(99, 102, 241, 0.2);
+            border: 2px solid var(--primary);
+            border-radius: 50%;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+
+        .founder-social a:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-5px);
+        }
+
+        .journey-section {
+            padding: 80px 20px;
+            background: var(--dark);
+        }
+
+        .journey-section h2 {
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 3rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .timeline {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .timeline-item {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+            position: relative;
+        }
+
+        .timeline-item:last-child {
+            border-bottom: none;
+        }
+
+        .timeline-year {
+            font-size: 1.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .timeline-content h3 {
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        .timeline-content p {
+            color: #cbd5e1;
+            line-height: 1.8;
+        }
+
+        .cta-section {
+            padding: 60px 20px;
+            text-align: center;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(99, 102, 241, 0.1));
+        }
+
+        .cta-section h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: #fff;
+        }
+
+        .cta-section p {
+            font-size: 1.1rem;
+            color: #cbd5e1;
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        @media (max-width: 768px) {
+            .founder-content {
+                grid-template-columns: 1fr;
+            }
+
+            .founder-info h1 {
+                font-size: 2rem;
+            }
+
+            .founder-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .timeline-item {
+                grid-template-columns: 1fr;
+            }
+
+            .timeline-year {
+                margin-bottom: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>BeatsVibe Technologies</h1>
+            </div>
+            <div class="nav-menu" id="navMenu">
+                <a href="index.html#home">Home</a>
+                <a href="index.html#courses">Courses</a>
+                <a href="index.html#internships">Internships</a>
+                <a href="index.html#career">Career</a>
+                <a href="founder.html">Founder</a>
+                <a href="index.html#contact">Contact</a>
+            </div>
+            <div class="hamburger" id="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Founder Hero -->
+    <section class="founder-hero">
+        <div class="founder-content">
+            <div class="founder-image">
+                <img src="https://via.placeholder.com/400x500?text=Suyash+Rathod" alt="Suyash Rathod - Founder">
+            </div>
+            <div class="founder-info">
+                <h1>Suyash Rathod</h1>
+                <div class="founder-title">Founder, BeatsVibe Technologies</div>
+                <p class="founder-bio">
+                    Visionary entrepreneur and tech innovator with a passion for transforming education. Suyash founded BeatsVibe Technologies with the mission to democratize quality tech education and empower the next generation of digital professionals.
+                </p>
+
+                <div class="founder-stats">
+                    <div class="stat">
+                        <div class="stat-number">10K+</div>
+                        <div class="stat-label">Students Trained</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">95%</div>
+                        <div class="stat-label">Job Placement</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">50+</div>
+                        <div class="stat-label">Corporate Partners</div>
+                    </div>
+                </div>
+
+                <div class="founder-skills">
+                    <h3>Expertise & Skills</h3>
+                    <div class="skills-list">
+                        <span class="skill-tag">EdTech Strategy</span>
+                        <span class="skill-tag">Curriculum Design</span>
+                        <span class="skill-tag">Tech Leadership</span>
+                        <span class="skill-tag">Business Development</span>
+                        <span class="skill-tag">AI/ML</span>
+                        <span class="skill-tag">Web Development</span>
+                    </div>
+                </div>
+
+                <div class="founder-social">
+                    <a href="https://linkedin.com" title="LinkedIn" target="_blank">in</a>
+                    <a href="https://twitter.com" title="Twitter" target="_blank">𝕏</a>
+                    <a href="https://github.com" title="GitHub" target="_blank">@</a>
+                    <a href="mailto:suyash@beatsvibe.com" title="Email">✉</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Journey Section -->
+    <section class="journey-section">
+        <div class="container">
+            <h2>My Journey</h2>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-year">2015</div>
+                    <div class="timeline-content">
+                        <h3>Started Coding Journey</h3>
+                        <p>Began learning programming with a vision to make tech education accessible. Completed multiple certifications and built several successful projects.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-year">2018</div>
+                    <div class="timeline-content">
+                        <h3>First Tech Role</h3>
+                        <p>Joined a leading tech company as a full-stack developer, gaining industry experience and understanding the skills gap in the market.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-year">2020</div>
+                    <div class="timeline-content">
+                        <h3>Identified the Opportunity</h3>
+                        <p>Recognized the massive gap between what students learn and what industry needs. Started mentoring 20+ aspiring developers in spare time.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-year">2021</div>
+                    <div class="timeline-content">
+                        <h3>Founded BeatsVibe Technologies</h3>
+                        <p>Launched BeatsVibe with a mission to provide affordable, industry-relevant tech education with guaranteed job support and mentorship.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-year">2023</div>
+                    <div class="timeline-content">
+                        <h3>Rapid Growth & Impact</h3>
+                        <p>BeatsVibe scaled to 10,000+ trained students, achieved 95% job placement rate, and partnered with 50+ leading tech companies.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-year">2024</div>
+                    <div class="timeline-content">
+                        <h3>Expanding Globally</h3>
+                        <p>Expanded to international markets, launched advanced AI/ML tracks, and built partnerships with universities and tech giants worldwide.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="container">
+            <h2>Join the BeatsVibe Community</h2>
+            <p>Be part of a movement to transform tech education. Learn from experienced mentors, build real-world projects, and launch your career with BeatsVibe.</p>
+            <a href="index.html#courses" class="btn btn-primary">Explore Courses</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>BeatsVibe</h4>
+                    <p>Empowering the next generation of tech professionals through quality education and mentorship.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="index.html#courses">Courses</a></li>
+                        <li><a href="index.html#internships">Internships</a></li>
+                        <li><a href="index.html#career">Career Support</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Legal</h4>
+                    <ul>
+                        <li><a href="#">Privacy Policy</a></li>
+                        <li><a href="#">Terms of Service</a></li>
+                        <li><a href="#">Contact</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 BeatsVibe Technologies. All rights reserved. | Founder: Suyash Rathod</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
