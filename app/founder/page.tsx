@@ -21,7 +21,7 @@ export default function FounderPage() {
               <div className="bg-gradient-to-br from-primary/20 to-accent/20 border border-border rounded-lg p-12 h-96 flex items-center justify-center">
                 <div className="text-center">
                   <div className="inline-flex items-center justify-center w-32 h-32 bg-gradient-to-r from-primary to-accent rounded-full mb-4">
-                    <span className="text-4xl font-bold text-white">https://github.com/Suyash-coder-12/beatsvibetechnologies/blob/ad973fbc0868709028a350c07f405f9901256832/Founder.jpeg</span>
+                    <span className="text-4xl font-bold text-white">Suyash Rathod</span>
                   </div>
                 </div>
               </div>
