@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="320" viewBox="0 0 1000 320" fill="none">
+  <defs>
+    <linearGradient id="sky" x1="500" y1="0" x2="500" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B8D9FA"/>
+      <stop offset=".62" stop-color="#EAF5FF"/>
+      <stop offset="1" stop-color="#D2E8FA"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="620" y1="20" x2="620" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#477EAE"/>
+      <stop offset=".48" stop-color="#A9CEE9"/>
+      <stop offset="1" stop-color="#3976A7"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="880" y1="90" x2="880" y2="310" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#76A6C9"/>
+      <stop offset="1" stop-color="#D1E6F3"/>
+    </linearGradient>
+    <linearGradient id="reflection" x1="502" y1="72" x2="502" y2="296" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EAF6FF" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#7EACD0" stop-opacity=".1"/>
+    </linearGradient>
+  </defs>
+  <rect width="1000" height="320" fill="url(#sky)"/>
+  <circle cx="886" cy="58" r="44" fill="#FFF8DB" fill-opacity=".72"/>
+  <path d="M0 224C116 194 176 221 264 201C360 179 410 214 494 194V320H0V224Z" fill="#EEF7F9" fill-opacity=".66"/>
+  <path d="M278 320V112L548 36L784 82V320H278Z" fill="#345F7E"/>
+  <path d="M295 122L550 52L766 94V306H295V122Z" fill="url(#glass)"/>
+  <path d="M315 127L532 69V306H315V127Z" fill="url(#reflection)"/>
+  <path d="M550 53V306M600 63V306M650 73V306M700 83V306M750 92V306" stroke="#E4F3FC" stroke-opacity=".68" stroke-width="5"/>
+  <path d="M296 153L766 126M296 190L766 172M296 227L766 218M296 266L766 263" stroke="#E4F3FC" stroke-opacity=".7" stroke-width="4"/>
+  <path d="M786 121L1000 88V320H786V121Z" fill="url(#wing)"/>
+  <path d="M808 130V309M855 122V309M902 114V309M949 106V309M996 99V309" stroke="#477A9F" stroke-opacity=".72" stroke-width="4"/>
+  <path d="M789 167L1000 143M789 207L1000 190M789 250L1000 239M789 290L1000 286" stroke="#F0F8FD" stroke-opacity=".8" stroke-width="4"/>
+  <path d="M0 287C142 270 241 292 373 281C548 267 680 295 827 276C895 267 947 273 1000 264V320H0V287Z" fill="#B7D7E7" fill-opacity=".72"/>
+  <g opacity=".8" fill="#548773">
+    <path d="M946 211h10v82h-10zM933 235h36v58h-36zM925 259h52v34h-52z"/>
+    <path d="M988 228h8v68h-8zM979 246h26v50h-26z"/>
+  </g>
+  <g transform="translate(446 131)">
+    <path d="M10 24L28 0L45 23L28 43L10 24Z" fill="#25A7E8"/>
+    <path d="M34 22L52 0L69 23L52 43L34 22Z" fill="#1478D4"/>
+    <text x="78" y="18" fill="#fff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">BeatsVibe</text>
+    <text x="79" y="39" fill="#F2F8FC" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="500">Technologies</text>
+  </g>
+</svg>

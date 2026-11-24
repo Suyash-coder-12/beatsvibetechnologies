@@ -1,0 +1,3 @@
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS display_name varchar(120) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS job_title varchar(120) NOT NULL DEFAULT '';
