@@ -9,7 +9,7 @@ import {
 
 const apiPrefix = "/api";
 const divisionColors = ["blue", "purple", "orange", "green", "cyan", "pink"];
-const allowedRoles = ["owner", "admin", "hr", "team_leader", "employee", "intern"];
+const allowedRoles = ["owner", "cto", "admin", "hr", "team_leader", "employee", "intern"];
 
 function parseBody(schema) {
   return (req, res, next) => {
@@ -133,7 +133,7 @@ function activityVerb(action, resourceType = "workspace") {
 }
 
 function hasOrganizationWideAccess(role) {
-  return ["owner", "admin", "hr"].includes(role);
+  return ["owner", "cto", "admin", "hr"].includes(role);
 }
 
 function projectVisibleToUser(project, user) {
@@ -478,7 +478,7 @@ export function createApp({ firebaseAuth, database, appOrigins, nodeEnv = "devel
       const body = req.validatedBody;
       const project = (await database.ref(`projects/${body.projectId}`).get()).val();
       if (!project || !(
-        ["owner", "admin"].includes(req.user.role)
+        ["owner", "cto", "admin"].includes(req.user.role)
         || (req.user.role === "team_leader" && project.members?.[req.user.id] === "lead")
       )) {
         throw setStatusError("Project not found or you cannot assign work to it.", 404);

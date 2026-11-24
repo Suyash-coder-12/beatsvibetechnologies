@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity, ArrowRight, ArrowUpRight, BriefcaseBusiness, CalendarDays, Check, CheckCheck,
-  ChevronLeft, ChevronRight, CreditCard, Download, Filter, FlaskConical, FolderKanban,
+  ChevronLeft, ChevronRight, CreditCard, Crown, Download, Filter, FlaskConical, FolderKanban,
   GraduationCap, ListFilter, LockKeyhole, MoreHorizontal, Plus, RotateCcw, Settings,
   ShieldCheck, Sparkles, Users, Video,
 } from "lucide-react";
@@ -10,6 +10,14 @@ import {
 } from "recharts";
 import { moduleCopy } from "./data.js";
 import { downloadFile, initialsFromName } from "./workspaceStore.js";
+import {
+  ROLE_TIERS,
+  canDo,
+  canModifyTargetEmployee,
+  canViewPage,
+  getAssignableRoles,
+  isFounder,
+} from "./permissions.js";
 
 export function PageTitle({ eyebrow, title, description, actions }) {
   return (
@@ -86,7 +94,10 @@ export function DivisionCard({ division, onOpen, projectCount }) {
   );
 }
 
-export function CompanyOverviewPage({ workspace, onNavigate }) {
+export function CompanyOverviewPage({ workspace, user, onNavigate }) {
+  const visibleDivisions = workspace.divisions.filter((division) =>
+    canViewPage(user, pageForDivision(division.name), workspace),
+  );
   return (
     <>
       <PageTitle
@@ -103,16 +114,18 @@ export function CompanyOverviewPage({ workspace, onNavigate }) {
           <h2>{workspace.settings.companyName}</h2>
           <p>One unified corporate workspace connecting R&amp;D, VedaIQ, DBM System, Career Cohorts, and Outlook collaboration.</p>
           <span className="company-status">
-            <i /> Active Workspace · {workspace.employees.length} Team Members · {workspace.projects.length} Projects
+            <i /> Active Workspace · {workspace.employees.length} Team Members · {visibleDivisions.length} Authorized Divisions
           </span>
         </div>
-        <button className="button button-primary" onClick={() => onNavigate("Employees")}>
-          View team directory <ArrowRight size={14} />
-        </button>
+        {canViewPage(user, "Employees", workspace) && (
+          <button className="button button-primary" onClick={() => onNavigate("Employees")}>
+            View team directory <ArrowRight size={14} />
+          </button>
+        )}
       </div>
 
       <div className="division-cards">
-        {workspace.divisions.map((division) => {
+        {visibleDivisions.map((division) => {
           const count = workspace.projects.filter((p) => p.division === division.name).length;
           return (
             <DivisionCard
@@ -187,6 +200,7 @@ const divisionFocus = {
 export function DivisionPage({
   page,
   workspace,
+  user,
   onOpenModal,
   onNavigate,
   onToggleInternCert,
@@ -196,8 +210,16 @@ export function DivisionPage({
   const isAll = page === "Divisions";
   const targetName = page === "Career & Internships" ? "BeatsVibe Career" : page;
   const division = workspace.divisions.find((d) => d.name === targetName) || workspace.divisions[0];
+  const canCreateDivision = canDo(user, "create_division", workspace);
+  const canCreateDivProject = canDo(user, "create_project", workspace, { division: division.name });
+  const canAddEmp = canDo(user, "add_employee", workspace);
+  const canDbm = canDo(user, "manage_dbm_clients", workspace);
+  const canVerifyCert = canDo(user, "verify_intern_cert", workspace);
 
   if (isAll) {
+    const visibleDivisions = workspace.divisions.filter((item) =>
+      canViewPage(user, pageForDivision(item.name), workspace),
+    );
     return (
       <>
         <PageTitle
@@ -205,13 +227,15 @@ export function DivisionPage({
           title="Divisions"
           description="Independent BeatsVibe teams and products connected through one shared workspace."
           actions={
-            <button className="button button-primary" onClick={() => onOpenModal({ type: "Add Division" })}>
-              <Plus size={16} /> Add division
-            </button>
+            canCreateDivision && (
+              <button className="button button-primary" onClick={() => onOpenModal({ type: "Add Division" })}>
+                <Plus size={16} /> Add division
+              </button>
+            )
           }
         />
         <div className="division-cards">
-          {workspace.divisions.map((item) => (
+          {visibleDivisions.map((item) => (
             <DivisionCard
               key={item.slug || item.name}
               division={item}
@@ -235,7 +259,7 @@ export function DivisionPage({
         description={moduleCopy[page] || division.detail}
         actions={
           <>
-            {page === "DBM System" && (
+            {page === "DBM System" && canDbm && (
               <button
                 className="button button-outline"
                 onClick={() => onOpenModal({ type: "Add DBM Client" })}
@@ -243,15 +267,27 @@ export function DivisionPage({
                 <Plus size={15} /> Add client
               </button>
             )}
-            <button
-              className="button button-primary"
-              onClick={() => onOpenModal({ type: "Create Project", defaultDivision: division.name })}
-            >
-              <Plus size={16} /> New initiative
-            </button>
+            {canCreateDivProject && (
+              <button
+                className="button button-primary"
+                onClick={() => onOpenModal({ type: "Create Project", defaultDivision: division.name })}
+              >
+                <Plus size={16} /> New initiative
+              </button>
+            )}
           </>
         }
       />
+
+      {page === "BeatsVibe Payments" && !isFounder(user) && (
+        <div className="permission-alert" style={{ marginBottom: 14 }}>
+          <LockKeyhole size={18} />
+          <div>
+            <strong>Founder Governance Scope</strong>
+            <p>You have compliance roadmap visibility for BeatsVibe Payments. Financial &amp; gateway modifications are restricted exclusively to Founder Suyash Rathod.</p>
+          </div>
+        </div>
+      )}
 
       <div className="module-banner">
         <span className={`division-icon large ${division.color}`}>{divisionIconComponent(division.icon)}</span>
@@ -298,12 +334,14 @@ export function DivisionPage({
                 <h2>Workstreams &amp; Projects</h2>
                 <p>Click any project to update progress or inspect tasks</p>
               </div>
-              <button
-                className="text-link"
-                onClick={() => onOpenModal({ type: "Create Project", defaultDivision: division.name })}
-              >
-                + Add
-              </button>
+              {canCreateDivProject && (
+                <button
+                  className="text-link"
+                  onClick={() => onOpenModal({ type: "Create Project", defaultDivision: division.name })}
+                >
+                  + Add
+                </button>
+              )}
             </div>
             <div className="workstream-list">
               {divisionProjects.map((proj) => (
@@ -341,12 +379,14 @@ export function DivisionPage({
         <div className="card table-card">
           <div className="table-toolbar">
             <div className="table-count"><strong>{divisionMembers.length}</strong> employees in {division.name}</div>
-            <button
-              className="button button-primary"
-              onClick={() => onOpenModal({ type: "Add Employee", defaultDivision: division.name })}
-            >
-              <Plus size={14} /> Add member
-            </button>
+            {canAddEmp && (
+              <button
+                className="button button-primary"
+                onClick={() => onOpenModal({ type: "Add Employee", defaultDivision: division.name })}
+              >
+                <Plus size={14} /> Add member
+              </button>
+            )}
           </div>
           <div className="responsive-table">
             <table>
@@ -377,9 +417,11 @@ export function DivisionPage({
         <div className="card table-card">
           <div className="table-toolbar">
             <div className="table-count"><strong>{workspace.dbmClients.length}</strong> managed startup &amp; client workspaces</div>
-            <button className="button button-primary" onClick={() => onOpenModal({ type: "Add DBM Client" })}>
-              <Plus size={14} /> Provision client
-            </button>
+            {canDbm && (
+              <button className="button button-primary" onClick={() => onOpenModal({ type: "Add DBM Client" })}>
+                <Plus size={14} /> Provision client
+              </button>
+            )}
           </div>
           <div className="responsive-table">
             <table>
@@ -392,14 +434,20 @@ export function DivisionPage({
                     <td>{c.emailService}</td>
                     <td>{c.plan}</td>
                     <td>
-                      <button
-                        className={`status-pill ${c.status === "Healthy" ? "success" : "warning"}`}
-                        style={{ border: 0 }}
-                        onClick={() => onToggleDbmStatus(c.id)}
-                        title="Click to toggle status"
-                      >
-                        <i /> {c.status}
-                      </button>
+                      {canDbm ? (
+                        <button
+                          className={`status-pill ${c.status === "Healthy" ? "success" : "warning"}`}
+                          style={{ border: 0 }}
+                          onClick={() => onToggleDbmStatus(c.id)}
+                          title="Click to toggle status"
+                        >
+                          <i /> {c.status}
+                        </button>
+                      ) : (
+                        <span className={`status-pill ${c.status === "Healthy" ? "success" : "warning"}`}>
+                          <i /> {c.status}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -413,6 +461,7 @@ export function DivisionPage({
         <div className="card table-card">
           <div className="table-toolbar">
             <div className="table-count"><strong>{workspace.internCohorts.length}</strong> active cohort interns</div>
+            {!canVerifyCert && <span style={{ fontSize: 11.5, color: "#64748b" }}><LockKeyhole size={12} style={{ verticalAlign: "-2px" }} /> Certificate verification reserved for Founder &amp; HR Lead</span>}
           </div>
           <div className="responsive-table">
             <table>
@@ -430,14 +479,20 @@ export function DivisionPage({
                       </div>
                     </td>
                     <td>
-                      <button
-                        className={`status-pill ${intern.certStatus === "Verified" ? "success" : "info"}`}
-                        style={{ border: 0 }}
-                        onClick={() => onToggleInternCert(intern.id)}
-                        title="Click to issue/verify certificate"
-                      >
-                        <i /> {intern.certStatus} · {intern.certCode}
-                      </button>
+                      {canVerifyCert ? (
+                        <button
+                          className={`status-pill ${intern.certStatus === "Verified" ? "success" : "info"}`}
+                          style={{ border: 0 }}
+                          onClick={() => onToggleInternCert(intern.id)}
+                          title="Click to issue/verify certificate"
+                        >
+                          <i /> {intern.certStatus} · {intern.certCode}
+                        </button>
+                      ) : (
+                        <span className={`status-pill ${intern.certStatus === "Verified" ? "success" : "info"}`}>
+                          <i /> {intern.certStatus} · {intern.certCode}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -461,6 +516,7 @@ export function DivisionPage({
 export function DirectoryPage({
   page,
   workspace,
+  user,
   search,
   onOpenModal,
   onUpdateEmployee,
@@ -469,6 +525,8 @@ export function DirectoryPage({
   const [divisionFilter, setDivisionFilter] = useState("All");
   const [sortAscending, setSortAscending] = useState(true);
   const usersPage = page === "User Management";
+  const canAdd = canDo(user, usersPage ? "manage_users" : "add_employee", workspace);
+  const assignableRoles = getAssignableRoles(user);
 
   const filtered = workspace.employees
     .filter((person) =>
@@ -492,12 +550,14 @@ export function DirectoryPage({
             : "Central employee directory across all BeatsVibe divisions. Click any employee to view tasks or update status."
         }
         actions={
-          <button
-            className="button button-primary"
-            onClick={() => onOpenModal({ type: usersPage ? "Invite User" : "Add Employee" })}
-          >
-            <Plus size={16} /> {usersPage ? "Invite user" : "Add employee"}
-          </button>
+          canAdd && (
+            <button
+              className="button button-primary"
+              onClick={() => onOpenModal({ type: usersPage ? "Invite User" : "Add Employee" })}
+            >
+              <Plus size={16} /> {usersPage ? "Invite user" : "Add employee"}
+            </button>
+          )
         }
       />
 
@@ -570,23 +630,21 @@ export function DirectoryPage({
                     )}
                   </td>
                   <td>
-                    {usersPage ? (
+                    {usersPage && canModifyTargetEmployee(user, person, workspace) && person.id !== user?.id && assignableRoles.some((r) => r.value === person.role) ? (
                       <select
                         className="inline-status-select"
                         value={person.role}
-                        disabled={person.role === "owner"}
                         onChange={(e) => onUpdateEmployee(person.id, { role: e.target.value })}
                       >
-                        <option value="owner">Owner</option>
-                        <option value="cto">CTO</option>
-                        <option value="admin">Admin</option>
-                        <option value="hr">HR</option>
-                        <option value="team_leader">Team Leader</option>
-                        <option value="employee">Employee</option>
-                        <option value="intern">Intern</option>
+                        {assignableRoles.map((r) => (
+                          <option key={r.value} value={r.value}>{r.label}</option>
+                        ))}
                       </select>
                     ) : (
-                      <span className="role-chip">{formatRole(person.role)}</span>
+                      <span className="role-chip">
+                        {person.role === "owner" ? <Crown size={11} style={{ marginRight: 4 }} /> : null}
+                        {formatRole(person.role)}
+                      </span>
                     )}
                   </td>
                   <td>
@@ -657,12 +715,14 @@ export function WorkTablePage({
             : "Update task progress inline or click any task to post work updates and comments."
         }
         actions={
-          <button
-            className="button button-primary"
-            onClick={() => onOpenModal({ type: isProjects ? "Create Project" : "Assign Task" })}
-          >
-            <Plus size={16} /> {isProjects ? "Create project" : "Assign task"}
-          </button>
+          canDo(user, isProjects ? "create_project" : "assign_task", workspace) && (
+            <button
+              className="button button-primary"
+              onClick={() => onOpenModal({ type: isProjects ? "Create Project" : "Assign Task" })}
+            >
+              <Plus size={16} /> {isProjects ? "Create project" : "Assign task"}
+            </button>
+          )
         }
       />
 
@@ -755,16 +815,22 @@ export function WorkTablePage({
                       <td>{row.assignee}</td>
                       <td><span className={`priority ${(row.priority || "medium").toLowerCase()}`}>{row.priority}</span></td>
                       <td>
-                        <select
-                          className="inline-status-select"
-                          value={row.status}
-                          onChange={(e) => onUpdateTask(row.id, { status: e.target.value })}
-                        >
-                          <option>To do</option>
-                          <option>In progress</option>
-                          <option>In review</option>
-                          <option>Done</option>
-                        </select>
+                        {canDo(user, "update_task", workspace, row) ? (
+                          <select
+                            className="inline-status-select"
+                            value={row.status}
+                            onChange={(e) => onUpdateTask(row.id, { status: e.target.value })}
+                          >
+                            <option>To do</option>
+                            <option>In progress</option>
+                            <option>In review</option>
+                            <option>Done</option>
+                          </select>
+                        ) : (
+                          <span className={`status-pill ${row.status === "Done" ? "success" : row.status === "In progress" ? "info" : "neutral"}`}>
+                            <i /> {row.status}
+                          </span>
+                        )}
                       </td>
                       <td>{row.due}</td>
                     </>
@@ -780,7 +846,7 @@ export function WorkTablePage({
   );
 }
 
-export function CalendarPage({ workspace, onOpenModal }) {
+export function CalendarPage({ workspace, user, onOpenModal }) {
   const [month, setMonth] = useState(() => new Date(2026, 10, 1));
   const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
   const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
@@ -789,6 +855,7 @@ export function CalendarPage({ workspace, onOpenModal }) {
     (_, index) => new Date(month.getFullYear(), month.getMonth(), index - startOfMonth.getDay() + 1),
   );
   const today = new Date();
+  const canSchedule = canDo(user, "schedule_event", workspace);
 
   const dateKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -797,16 +864,18 @@ export function CalendarPage({ workspace, onOpenModal }) {
       <PageTitle
         eyebrow="COMMUNICATION"
         title="Calendar"
-        description="Company events, sprint reviews, and team syncs. Click any event to RSVP or click a day to add."
+        description="Company events, sprint reviews, and team syncs. Click any event to RSVP."
         actions={
-          <>
-            <button className="button button-outline" onClick={() => onOpenModal({ type: "Schedule Meeting" })}>
-              <Plus size={15} /> Schedule meeting
-            </button>
-            <button className="button button-primary" onClick={() => onOpenModal({ type: "Add Company Event" })}>
-              <CalendarDays size={15} /> Add event
-            </button>
-          </>
+          canSchedule && (
+            <>
+              <button className="button button-outline" onClick={() => onOpenModal({ type: "Schedule Meeting" })}>
+                <Plus size={15} /> Schedule meeting
+              </button>
+              <button className="button button-primary" onClick={() => onOpenModal({ type: "Add Company Event" })}>
+                <CalendarDays size={15} /> Add event
+              </button>
+            </>
+          )
         }
       />
 
@@ -838,7 +907,7 @@ export function CalendarPage({ workspace, onOpenModal }) {
                   <div
                     className={`calendar-day ${date.getMonth() !== month.getMonth() ? "outside" : ""} ${isToday ? "today" : ""}`}
                     key={key}
-                    onDoubleClick={() => onOpenModal({ type: "Add Company Event", defaultDate: key })}
+                    onDoubleClick={() => canSchedule && onOpenModal({ type: "Add Company Event", defaultDate: key })}
                   >
                     <span>{date.getDate()}</span>
                     {dayEvents.map((ev) => (
@@ -883,9 +952,11 @@ export function CalendarPage({ workspace, onOpenModal }) {
               </div>
             </button>
           ))}
-          <button className="button button-outline agenda-add" onClick={() => onOpenModal({ type: "Add Company Event" })}>
-            <Plus size={14} /> Add event
-          </button>
+          {canSchedule && (
+            <button className="button button-outline agenda-add" onClick={() => onOpenModal({ type: "Add Company Event" })}>
+              <Plus size={14} /> Add event
+            </button>
+          )}
         </aside>
       </div>
     </>
@@ -895,6 +966,7 @@ export function CalendarPage({ workspace, onOpenModal }) {
 export function MeetingsPage({ workspace, user, onOpenModal, onRsvpEvent, onNotify }) {
   const meetings = workspace.events.filter((e) => e.type === "meeting" || e.title.toLowerCase().includes("sync") || e.title.toLowerCase().includes("review"));
   const myEmail = user?.email?.toLowerCase() || "";
+  const canSchedule = canDo(user, "schedule_event", workspace);
 
   return (
     <>
@@ -903,9 +975,11 @@ export function MeetingsPage({ workspace, user, onOpenModal, onRsvpEvent, onNoti
         title="Meetings Hub"
         description="Join active video rooms, review agendas, and update your meeting RSVP status."
         actions={
-          <button className="button button-primary" onClick={() => onOpenModal({ type: "Schedule Meeting" })}>
-            <Plus size={16} /> Schedule meeting
-          </button>
+          canSchedule && (
+            <button className="button button-primary" onClick={() => onOpenModal({ type: "Schedule Meeting" })}>
+              <Plus size={16} /> Schedule meeting
+            </button>
+          )
         }
       />
 
@@ -972,12 +1046,14 @@ export function ResourceListPage({ page, workspace, user, search, onOpenModal, o
             : "Shared knowledge base, research notes, and SOP documents. Click any card to read or export."
         }
         actions={
-          <button
-            className="button button-primary"
-            onClick={() => onOpenModal({ type: isAnnouncements ? "Publish Announcement" : "Add Document" })}
-          >
-            <Plus size={16} /> {isAnnouncements ? "New announcement" : "Add document"}
-          </button>
+          canDo(user, isAnnouncements ? "publish_announcement" : "create_document", workspace) && (
+            <button
+              className="button button-primary"
+              onClick={() => onOpenModal({ type: isAnnouncements ? "Publish Announcement" : "Add Document" })}
+            >
+              <Plus size={16} /> {isAnnouncements ? "New announcement" : "Add document"}
+            </button>
+          )
         }
       />
 
@@ -1032,9 +1108,10 @@ export function ResourceListPage({ page, workspace, user, search, onOpenModal, o
   );
 }
 
-export function AnalyticsPage({ page, workspace, onNotify }) {
+export function AnalyticsPage({ page, workspace, user, onNotify }) {
   const [range, setRange] = useState("30 Days");
   const multiplier = range === "7 Days" ? 0.5 : range === "Quarter" ? 2 : range === "YTD" ? 3 : 1;
+  const canExport = canDo(user, "export_reports", workspace);
 
   const doneTasks = workspace.tasks.filter((t) => t.status === "Done").length;
   const taskCompletionPct = workspace.tasks.length ? Math.round((doneTasks / workspace.tasks.length) * 100) : 0;
@@ -1097,9 +1174,11 @@ export function AnalyticsPage({ page, workspace, onNotify }) {
                 <option>YTD</option>
               </select>
             </div>
-            <button className="button button-primary" onClick={handleExport}>
-              <Download size={15} /> Export CSV
-            </button>
+            {canExport && (
+              <button className="button button-primary" onClick={handleExport}>
+                <Download size={15} /> Export CSV
+              </button>
+            )}
           </div>
         }
       />
@@ -1181,52 +1260,117 @@ export function AnalyticsPage({ page, workspace, onNotify }) {
 }
 
 export function RolesPermissionsPage({ workspace, user, onTogglePermission }) {
-  const canEdit = ["owner", "cto", "admin"].includes(user?.role);
+  const canEdit = isFounder(user);
   const roles = Object.entries(workspace.roleMatrix);
+  const tierOrder = Object.entries(ROLE_TIERS);
 
   return (
     <>
       <PageTitle
-        eyebrow="ADMINISTRATION"
+        eyebrow="FOUNDER GOVERNANCE · 7-TIER RBAC"
         title="Roles & Permissions"
-        description="Role-based access matrix enforced across backend Express routes and workspace workflows."
+        description="Tiered corporate clearance architecture. Founder holds supreme governance while executive and staff tiers narrow progressively."
       />
       <div className="permission-alert">
-        <ShieldCheck size={18} />
+        {canEdit ? <Crown size={18} /> : <ShieldCheck size={18} />}
         <div>
-          <strong>Role-Based Access Control Active</strong>
-          <p>You are signed in as <b>{formatRole(user?.role)}</b>. {canEdit ? "As Owner/Admin, you can toggle capability switches below." : "Switch to an Owner or Admin account to modify matrix switches."}</p>
+          <strong>
+            {canEdit ? "Founder Supreme Governance Active (Editable)" : "Tiered Access Inspection Mode (Read-Only)"}
+          </strong>
+          <p>
+            You are signed in as <b>{formatRole(user?.role)}</b>.{" "}
+            {canEdit
+              ? "As Founder & CEO, you hold full authority across Settings, Payments, Executive Roles, Divisions, and live permission switches below."
+              : "Only Founder Suyash Rathod can modify role permission switches, executive accounts, Company Settings, or Payments governance."}
+          </p>
         </div>
       </div>
 
+      <section className="tier-ladder-grid">
+        {tierOrder.map(([roleKey, meta]) => {
+          const isCurrent = user?.role === roleKey;
+          return (
+            <div key={roleKey} className={`card tier-card tier-${meta.tone} ${isCurrent ? "current" : ""}`}>
+              <div className="tier-card-top">
+                <span className="tier-badge">TIER {meta.tier}</span>
+                <span className="tier-rank-score">{meta.rank}%</span>
+              </div>
+              <strong>{meta.label}</strong>
+              <p>{meta.summary}</p>
+              <div className="tier-meter">
+                <span style={{ width: `${meta.rank}%` }} />
+              </div>
+              {isCurrent && <span className="tier-current-flag">Your Active Clearance</span>}
+            </div>
+          );
+        })}
+      </section>
+
       <div className="card table-card">
+        <div className="table-toolbar">
+          <div className="table-count"><strong>{roles.length}</strong> corporate permission tiers</div>
+          <span style={{ fontSize: 11.5, color: "#64748b" }}>
+            {canEdit ? "Click toggles to adjust operational capabilities (Founder row locked at 100%)" : "Locked · Read-only view"}
+          </span>
+        </div>
         <div className="responsive-table">
           <table>
             <thead>
               <tr>
-                <th>ROLE</th>
-                <th>WORKSPACE SCOPE</th>
-                <th>MANAGE USERS</th>
-                <th>EDIT SETTINGS</th>
-                <th>EDIT PROJECTS</th>
-                <th>EDIT EMPLOYEES</th>
+                <th>ROLE / TIER</th>
+                <th>SCOPE SUMMARY</th>
+                <th>USERS</th>
+                <th>SETTINGS</th>
+                <th>PROJECTS</th>
+                <th>PEOPLE</th>
+                <th>TASKS</th>
+                <th>NOTICES</th>
+                <th>EXPORT</th>
+                <th>PAYMENTS</th>
+                <th>AUDIT</th>
               </tr>
             </thead>
             <tbody>
               {roles.map(([roleKey, info]) => (
-                <tr key={roleKey}>
-                  <td><strong>{info.label}</strong></td>
+                <tr key={roleKey} className={roleKey === "owner" ? "owner-matrix-row" : ""}>
+                  <td>
+                    <strong style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                      {roleKey === "owner" && <Crown size={13} color="#0a3d91" />}
+                      {info.label}
+                    </strong>
+                    <br />
+                    <small style={{ color: "#64748b", fontSize: 10.5 }}>{info.tier || ""}</small>
+                  </td>
                   <td>{info.workspace}</td>
-                  {["canManageUsers", "canManageSettings", "canEditProjects", "canEditEmployees"].map((perm) => (
+                  {[
+                    "canManageUsers",
+                    "canManageSettings",
+                    "canEditProjects",
+                    "canEditEmployees",
+                    "canAssignTasks",
+                    "canPublishNotices",
+                    "canExportReports",
+                  ].map((perm) => (
                     <td key={perm}>
                       <input
                         type="checkbox"
+                        className="rbac-switch"
                         checked={Boolean(info[perm])}
                         disabled={!canEdit || roleKey === "owner"}
                         onChange={() => onTogglePermission(roleKey, perm)}
                       />
                     </td>
                   ))}
+                  <td>
+                    <span className={`status-pill ${roleKey === "owner" ? "success" : ["cto", "admin"].includes(roleKey) ? "info" : "neutral"}`}>
+                      {info.paymentsAccess || (roleKey === "owner" ? "Full" : "Restricted")}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`status-pill ${roleKey === "owner" ? "success" : ["cto", "admin"].includes(roleKey) ? "warning" : "neutral"}`}>
+                      {info.auditAccess || (roleKey === "owner" ? "Govern" : "None")}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1362,10 +1506,11 @@ export function CompanySettingsPage({ workspace, onSaveSettings, onResetWorkspac
   );
 }
 
-export function AuditLogsPage({ workspace, search, onNotify }) {
+export function AuditLogsPage({ workspace, user, search, onNotify, onClearAuditLogs }) {
   const rows = workspace.auditLogs.filter((row) =>
     `${row.action} ${row.actorEmail} ${row.detail}`.toLowerCase().includes(search.toLowerCase()),
   );
+  const canExportAudit = canDo(user, "export_audit", workspace);
 
   return (
     <>
@@ -1374,15 +1519,25 @@ export function AuditLogsPage({ workspace, search, onNotify }) {
         title="Security & Audit Logs"
         description="Live operational audit trail recording logins, task updates, employee onboarding, and Outlook messages."
         actions={
-          <button
-            className="button button-outline"
-            onClick={() => {
-              downloadFile("beatsvibe-audit-logs.json", JSON.stringify(rows, null, 2));
-              onNotify("Audit logs exported.");
-            }}
-          >
-            <Download size={15} /> Export JSON
-          </button>
+          canExportAudit && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                className="button button-outline"
+                onClick={() => {
+                  downloadFile("beatsvibe-audit-logs.json", JSON.stringify(rows, null, 2));
+                  onNotify("Audit logs exported.");
+                }}
+              >
+                <Download size={15} /> Export JSON
+              </button>
+              <button
+                className="button button-danger"
+                onClick={onClearAuditLogs}
+              >
+                <RotateCcw size={14} /> Trim Older Logs
+              </button>
+            </div>
+          )
         }
       />
       <div className="card table-card">

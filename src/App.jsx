@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, ArrowRight, ArrowUpRight, Bell, BriefcaseBusiness, CalendarDays,
   Check, CheckCheck, ChevronDown, ChevronRight, CircleHelp, ClipboardList,
-  CreditCard, Database, FileText, FlaskConical, FolderKanban, GraduationCap,
+  CreditCard, Crown, Database, FileText, FlaskConical, FolderKanban, GraduationCap,
   LayoutDashboard, LockKeyhole, Mail, Megaphone, Menu, MoreHorizontal, Plus,
   Search, Settings, ShieldCheck, Sparkles, Users, X, Zap,
 } from "lucide-react";
@@ -24,6 +24,15 @@ import {
   authenticateLocalUser, createAuditEntry, initialsFromName, loadActiveSession,
   loadWorkspaceState, resetWorkspaceState, saveActiveSession, saveWorkspaceState,
 } from "./workspaceStore.js";
+import {
+  canDeleteTargetEmployee,
+  canDo,
+  canModifyTargetEmployee,
+  canViewPage,
+  getPermittedCapabilityCount,
+  getRoleTier,
+  isFounder,
+} from "./permissions.js";
 
 const iconMap = {
   Dashboard: LayoutDashboard,
@@ -92,6 +101,10 @@ function App() {
   };
 
   const navigate = (page) => {
+    if (user && !canViewPage(user, page, workspace)) {
+      notify(`"${page}" requires higher role clearance.`);
+      return;
+    }
     setActivePage(page);
     setSidebarOpen(false);
     setSearch("");
@@ -120,6 +133,7 @@ function App() {
       return;
     }
     setUser(result.user);
+    setActivePage("Dashboard");
     setWorkspace((prev) => ({
       ...prev,
       auditLogs: [
@@ -173,8 +187,12 @@ function App() {
   const hasUnreadNotifs = notifications.some((n) => !workspace.readNotificationIds.includes(n.id));
   const openTasksCount = workspace.tasks.filter((t) => t.status !== "Done").length;
 
-  // Workspace mutations
+  // Workspace mutations (enforced by 7-tier RBAC)
   const handleAddEmployee = (emp) => {
+    if (!canDo(user, "add_employee", workspace) && !canDo(user, "manage_users", workspace)) {
+      notify("Only HR, Admin, CTO, or Founder can add employees.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({ ...prev, employees: [emp, ...prev.employees] }),
       "employee.created",
@@ -184,7 +202,12 @@ function App() {
     notify(`Employee ${emp.name} added with login ID ${emp.email}.`);
   };
 
-  const handleUpdateEmployee = (id, patch) => {
+  const handleUpdateEmployee = (id, patch, isSelfProfile = false) => {
+    const target = workspace.employees.find((e) => e.id === id);
+    if (!isSelfProfile && (!target || !canModifyTargetEmployee(user, target, workspace))) {
+      notify("You do not have clearance to modify this team member.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({
         ...prev,
@@ -201,6 +224,10 @@ function App() {
 
   const handleDeleteEmployee = (id) => {
     const target = workspace.employees.find((e) => e.id === id);
+    if (!target || !canDeleteTargetEmployee(user, target, workspace)) {
+      notify("Restricted: insufficient role clearance to remove this account.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({ ...prev, employees: prev.employees.filter((e) => e.id !== id) }),
       "employee.removed",
@@ -211,6 +238,10 @@ function App() {
   };
 
   const handleCreateProject = (proj) => {
+    if (!canDo(user, "create_project", workspace, proj)) {
+      notify("You do not have permission to create projects in this division.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({ ...prev, projects: [proj, ...prev.projects] }),
       "project.created",
@@ -221,6 +252,11 @@ function App() {
   };
 
   const handleUpdateProject = (id, patch) => {
+    const target = workspace.projects.find((p) => p.id === id);
+    if (!target || !canDo(user, "edit_project", workspace, target)) {
+      notify("Project updates are restricted for your tier.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({
         ...prev,
@@ -236,6 +272,10 @@ function App() {
 
   const handleDeleteProject = (id) => {
     const target = workspace.projects.find((p) => p.id === id);
+    if (!target || !canDo(user, "delete_project", workspace, target)) {
+      notify("Only Founder or CTO can delete projects.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({ ...prev, projects: prev.projects.filter((p) => p.id !== id) }),
       "project.deleted",
@@ -246,6 +286,10 @@ function App() {
   };
 
   const handleAssignTask = (task) => {
+    if (!canDo(user, "assign_task", workspace)) {
+      notify("Task assignment requires Team Leader or higher clearance.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({ ...prev, tasks: [task, ...prev.tasks] }),
       "task.assigned",
@@ -256,6 +300,11 @@ function App() {
   };
 
   const handleUpdateTask = (id, patch) => {
+    const target = workspace.tasks.find((t) => t.id === id);
+    if (!target || !canDo(user, "update_task", workspace, target)) {
+      notify("You can only update tasks assigned to you.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({
         ...prev,
@@ -272,6 +321,11 @@ function App() {
   };
 
   const handleDeleteTask = (id) => {
+    const target = workspace.tasks.find((t) => t.id === id);
+    if (!target || !canDo(user, "delete_task", workspace, target)) {
+      notify("Task deletion requires Admin, CTO, or Founder clearance.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({ ...prev, tasks: prev.tasks.filter((t) => t.id !== id) }),
       "task.deleted",
@@ -282,6 +336,10 @@ function App() {
   };
 
   const handleCreateEvent = (ev) => {
+    if (!canDo(user, "schedule_event", workspace)) {
+      notify("Scheduling events requires Lead, HR, Admin, CTO, or Founder clearance.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({ ...prev, events: [...prev.events, ev] }),
       "event.scheduled",
@@ -314,6 +372,11 @@ function App() {
   };
 
   const handleDeleteEvent = (id) => {
+    const target = workspace.events.find((ev) => ev.id === id);
+    if (!target || !canDo(user, "delete_event", workspace, target)) {
+      notify("You cannot cancel this event.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({ ...prev, events: prev.events.filter((ev) => ev.id !== id) }),
       "event.cancelled",
@@ -324,6 +387,10 @@ function App() {
   };
 
   const handlePublishAnnouncement = (ann) => {
+    if (!canDo(user, "publish_announcement", workspace)) {
+      notify("Publishing announcements is restricted to HR, Admin, CTO, and Founder.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({ ...prev, announcements: [ann, ...prev.announcements] }),
       "announcement.published",
@@ -362,6 +429,11 @@ function App() {
   };
 
   const handleDeleteAnnouncement = (id) => {
+    const target = workspace.announcements.find((a) => a.id === id);
+    if (!target || !canDo(user, "delete_announcement", workspace, target)) {
+      notify("Removing company announcements is restricted to Founder & CTO.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({ ...prev, announcements: prev.announcements.filter((a) => a.id !== id) }),
       "announcement.deleted",
@@ -372,6 +444,10 @@ function App() {
   };
 
   const handleCreateDocument = (doc) => {
+    if (!canDo(user, "create_document", workspace)) {
+      notify("Document creation is disabled for your tier.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({ ...prev, documents: [doc, ...prev.documents] }),
       "document.created",
@@ -382,6 +458,11 @@ function App() {
   };
 
   const handleDeleteDocument = (id) => {
+    const target = workspace.documents.find((d) => d.id === id);
+    if (!target || !canDo(user, "delete_document", workspace, target)) {
+      notify("Document deletion is restricted to Admin, CTO, or Founder.");
+      return;
+    }
     updateWorkspace(
       (prev) => ({ ...prev, documents: prev.documents.filter((d) => d.id !== id) }),
       "document.deleted",
@@ -449,7 +530,7 @@ function App() {
       initials: initialsFromName(patch.name ?? user.displayName),
       ...(patch.password ? { password: patch.password } : {}),
     };
-    handleUpdateEmployee(user.id, updatedEmp);
+    handleUpdateEmployee(user.id, updatedEmp, true);
     setUser((prev) => ({
       ...prev,
       displayName: updatedEmp.name,
@@ -484,6 +565,16 @@ function App() {
     );
   }
 
+  const roleTier = getRoleTier(user.role);
+  const visibleNavGroups = navigation
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => canViewPage(user, item, workspace)),
+    }))
+    .filter((group) => group.items.length > 0);
+  const capCount = getPermittedCapabilityCount(user, workspace);
+  const canViewActivePage = canViewPage(user, activePage, workspace);
+
   return (
     <DeviceSecurityGuard>
       <div className="app-shell app-reveal">
@@ -508,7 +599,7 @@ function App() {
         </button>
 
         <nav className="side-nav" aria-label="Main navigation">
-          {navigation.map((group) => (
+          {visibleNavGroups.map((group) => (
             <section className="nav-group" key={group.group}>
               <button
                 className="nav-heading"
@@ -537,6 +628,14 @@ function App() {
         </nav>
 
         <div className="sidebar-bottom">
+          <div className={`sidebar-clearance tier-${roleTier.tone}`}>
+            <div className="sidebar-clearance-head">
+              <span>{isFounder(user) ? <Crown size={12} /> : <ShieldCheck size={12} />} {roleTier.shortLabel}</span>
+              <strong>{capCount}/16</strong>
+            </div>
+            <div className="tier-meter"><span style={{ width: `${roleTier.rank}%` }} /></div>
+          </div>
+
           <div className="help-card">
             <div className="help-icon"><CircleHelp size={17} /></div>
             <strong>Need a hand?</strong>
@@ -578,12 +677,21 @@ function App() {
                   ref={searchInputRef}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search pages, employees, tasks, emails…"
+                  placeholder="Search authorized pages, tasks, emails…"
                 />
                 <kbd>⌘ K</kbd>
               </label>
-              {search && <SearchResults query={search} workspace={workspace} onSelect={navigate} />}
+              {search && <SearchResults query={search} workspace={workspace} user={user} onSelect={navigate} />}
             </div>
+
+            <button
+              className={`topbar-tier-pill tier-${roleTier.tone}`}
+              onClick={() => navigate(canViewPage(user, "Roles & Permissions", workspace) ? "Roles & Permissions" : "My Profile")}
+              title={roleTier.summary}
+            >
+              {isFounder(user) ? <Crown size={13} /> : <ShieldCheck size={13} />}
+              <span>{roleTier.shortLabel}</span>
+            </button>
 
             <button
               className={`icon-button notification-button ${notificationsOpen ? "selected" : ""}`}
@@ -658,7 +766,12 @@ function App() {
               </div>
               <button onClick={() => navigate("My Profile")}><Users size={15} /> My profile &amp; availability</button>
               <button onClick={() => navigate("Outlook")}><Mail size={15} /> Outlook Mail ({unreadMails.length})</button>
-              <button onClick={() => navigate("Company Settings")}><Settings size={15} /> Settings</button>
+              {canViewPage(user, "Roles & Permissions", workspace) && (
+                <button onClick={() => navigate("Roles & Permissions")}><ShieldCheck size={15} /> Access matrix</button>
+              )}
+              {canViewPage(user, "Company Settings", workspace) && (
+                <button onClick={() => navigate("Company Settings")}><Settings size={15} /> Founder settings</button>
+              )}
 
               <button onClick={handleSignOut} style={{ marginTop: 6, borderTop: "1px solid #eef2f6", paddingTop: 10, color: "#b91c1c" }}>
                 <LockKeyhole size={15} /> Sign out
@@ -668,153 +781,212 @@ function App() {
         </header>
 
         <div className="page-content">
-          {activePage === "Dashboard" && (
-            <Dashboard
-              workspace={workspace}
-              user={user}
-              onOpenModal={setModal}
-              onNavigate={navigate}
-              onUpdateTask={handleUpdateTask}
-            />
-          )}
-          {activePage === "Company Overview" && (
-            <CompanyOverviewPage workspace={workspace} onNavigate={navigate} />
-          )}
-          {(activePage === "Divisions" || ["BeatsVibe R&D", "DBM System", "Career & Internships", "BeatsVibe Payments", "VedaIQ – Veda"].includes(activePage)) && (
-            <DivisionPage
-              page={activePage}
-              workspace={workspace}
-              onOpenModal={setModal}
-              onNavigate={navigate}
-              onToggleInternCert={(id) => {
-                updateWorkspace(
-                  (prev) => ({
-                    ...prev,
-                    internCohorts: prev.internCohorts.map((c) =>
-                      c.id === id ? { ...c, certStatus: c.certStatus === "Verified" ? "In training" : "Verified" } : c,
-                    ),
-                  }),
-                  "intern.certificate_updated",
-                  `Updated internship certificate status`,
-                  "success",
-                );
-                notify("Intern certificate status updated.");
-              }}
-              onToggleDbmStatus={(id) => {
-                updateWorkspace(
-                  (prev) => ({
-                    ...prev,
-                    dbmClients: prev.dbmClients.map((c) =>
-                      c.id === id ? { ...c, status: c.status === "Healthy" ? "In setup" : "Healthy", emailService: c.status === "Healthy" ? "DNS Verifying" : "Active (10 mailboxes)" } : c,
-                    ),
-                  }),
-                  "dbm.client_updated",
-                  `Updated DBM client provisioning status`,
-                );
-                notify("DBM client service status updated.");
-              }}
-            />
-          )}
-          {(activePage === "Employees" || activePage === "User Management") && (
-            <DirectoryPage
-              page={activePage}
-              workspace={workspace}
-              search={search}
-              onOpenModal={setModal}
-              onUpdateEmployee={handleUpdateEmployee}
-            />
-          )}
-          {(activePage === "Projects" || activePage === "Tasks") && (
-            <WorkTablePage
-              page={activePage}
-              workspace={workspace}
-              user={user}
-              search={search}
-              onOpenModal={setModal}
-              onUpdateTask={handleUpdateTask}
-            />
-          )}
-          {activePage === "Outlook" && (
-            <OutlookPage
-              user={user}
-              employees={workspace.employees}
-              emails={workspace.emails}
-              onSendEmail={handleSendEmail}
-              onUpdateEmail={handleUpdateEmail}
-              onDeleteEmail={handleDeleteEmail}
-              onNotify={notify}
-            />
-          )}
-          {activePage === "Calendar" && (
-            <CalendarPage workspace={workspace} onOpenModal={setModal} />
-          )}
-          {activePage === "Meetings" && (
-            <MeetingsPage
-              workspace={workspace}
-              user={user}
-              onOpenModal={setModal}
-              onRsvpEvent={handleRsvpEvent}
-              onNotify={notify}
-            />
-          )}
-          {(activePage === "Announcements" || activePage === "Documents") && (
-            <ResourceListPage
-              page={activePage}
-              workspace={workspace}
-              user={user}
-              search={search}
-              onOpenModal={setModal}
-              onAckAnnouncement={handleAckAnnouncement}
-            />
-          )}
-          {["Reports", "Project Analytics", "Employee Analytics", "Division Performance"].includes(activePage) && (
-            <AnalyticsPage page={activePage} workspace={workspace} onNotify={notify} />
-          )}
-          {activePage === "Roles & Permissions" && (
-            <RolesPermissionsPage
-              workspace={workspace}
-              user={user}
-              onTogglePermission={(roleKey, perm) => {
-                updateWorkspace(
-                  (prev) => ({
-                    ...prev,
-                    roleMatrix: {
-                      ...prev.roleMatrix,
-                      [roleKey]: { ...prev.roleMatrix[roleKey], [perm]: !prev.roleMatrix[roleKey][perm] },
-                    },
-                  }),
-                  "rbac.updated",
-                  `Toggled ${perm} for ${roleKey}`,
-                );
-                notify("Role permission updated.");
-              }}
-            />
-          )}
-          {activePage === "Company Settings" && (
-            <CompanySettingsPage
-              workspace={workspace}
-              onSaveSettings={(nextSettings) => {
-                updateWorkspace(
-                  (prev) => ({ ...prev, settings: nextSettings }),
-                  "settings.saved",
-                  "Updated BeatsVibe workspace settings",
-                  "success",
-                );
-                notify("Company settings saved.");
-              }}
-              onResetWorkspace={() => {
-                const fresh = resetWorkspaceState();
-                setWorkspace(fresh);
-                notify("Workspace restored to initial sample state.");
-              }}
-              onNotify={notify}
-            />
-          )}
-          {activePage === "Security & Audit Logs" && (
-            <AuditLogsPage workspace={workspace} search={search} onNotify={notify} />
-          )}
-          {activePage === "My Profile" && (
-            <ProfilePage key={user.id} user={user} onUpdateProfile={handleUpdateProfile} onNotify={notify} />
+          {!canViewActivePage ? (
+            <div className="card permission-alert" style={{ padding: 28, marginTop: 18 }}>
+              <LockKeyhole size={22} />
+              <div style={{ flex: 1 }}>
+                <strong>Restricted Module · Clearance Required</strong>
+                <p>Your current role (<b>{formatRole(user.role)}</b> · {roleTier.shortLabel}) does not include access to <b>{activePage}</b>.</p>
+                <button className="button button-primary" style={{ marginTop: 12 }} onClick={() => setActivePage("Dashboard")}>
+                  Return to Dashboard <ArrowRight size={14} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {activePage === "Dashboard" && (
+                <Dashboard
+                  workspace={workspace}
+                  user={user}
+                  onOpenModal={setModal}
+                  onNavigate={navigate}
+                  onUpdateTask={handleUpdateTask}
+                />
+              )}
+              {activePage === "Company Overview" && (
+                <CompanyOverviewPage workspace={workspace} user={user} onNavigate={navigate} />
+              )}
+              {(activePage === "Divisions" || ["BeatsVibe R&D", "DBM System", "Career & Internships", "BeatsVibe Payments", "VedaIQ – Veda"].includes(activePage)) && (
+                <DivisionPage
+                  page={activePage}
+                  workspace={workspace}
+                  user={user}
+                  onOpenModal={setModal}
+                  onNavigate={navigate}
+                  onToggleInternCert={(id) => {
+                    if (!canDo(user, "verify_intern_cert", workspace)) {
+                      notify("Only Founder or HR Lead can verify intern certificates.");
+                      return;
+                    }
+                    updateWorkspace(
+                      (prev) => ({
+                        ...prev,
+                        internCohorts: prev.internCohorts.map((c) =>
+                          c.id === id ? { ...c, certStatus: c.certStatus === "Verified" ? "In training" : "Verified" } : c,
+                        ),
+                      }),
+                      "intern.certificate_updated",
+                      `Updated internship certificate status`,
+                      "success",
+                    );
+                    notify("Intern certificate status updated.");
+                  }}
+                  onToggleDbmStatus={(id) => {
+                    if (!canDo(user, "manage_dbm_clients", workspace)) {
+                      notify("Only DBM Lead, Admin, CTO, or Founder can update DBM clients.");
+                      return;
+                    }
+                    updateWorkspace(
+                      (prev) => ({
+                        ...prev,
+                        dbmClients: prev.dbmClients.map((c) =>
+                          c.id === id ? { ...c, status: c.status === "Healthy" ? "In setup" : "Healthy", emailService: c.status === "Healthy" ? "DNS Verifying" : "Active (10 mailboxes)" } : c,
+                        ),
+                      }),
+                      "dbm.client_updated",
+                      `Updated DBM client provisioning status`,
+                    );
+                    notify("DBM client service status updated.");
+                  }}
+                />
+              )}
+              {(activePage === "Employees" || activePage === "User Management") && (
+                <DirectoryPage
+                  page={activePage}
+                  workspace={workspace}
+                  user={user}
+                  search={search}
+                  onOpenModal={setModal}
+                  onUpdateEmployee={handleUpdateEmployee}
+                />
+              )}
+              {(activePage === "Projects" || activePage === "Tasks") && (
+                <WorkTablePage
+                  page={activePage}
+                  workspace={workspace}
+                  user={user}
+                  search={search}
+                  onOpenModal={setModal}
+                  onUpdateTask={handleUpdateTask}
+                />
+              )}
+              {activePage === "Outlook" && (
+                <OutlookPage
+                  user={user}
+                  workspace={workspace}
+                  employees={workspace.employees}
+                  emails={workspace.emails}
+                  onSendEmail={handleSendEmail}
+                  onUpdateEmail={handleUpdateEmail}
+                  onDeleteEmail={handleDeleteEmail}
+                  onNotify={notify}
+                />
+              )}
+              {activePage === "Calendar" && (
+                <CalendarPage workspace={workspace} user={user} onOpenModal={setModal} />
+              )}
+              {activePage === "Meetings" && (
+                <MeetingsPage
+                  workspace={workspace}
+                  user={user}
+                  onOpenModal={setModal}
+                  onRsvpEvent={handleRsvpEvent}
+                  onNotify={notify}
+                />
+              )}
+              {(activePage === "Announcements" || activePage === "Documents") && (
+                <ResourceListPage
+                  page={activePage}
+                  workspace={workspace}
+                  user={user}
+                  search={search}
+                  onOpenModal={setModal}
+                  onAckAnnouncement={handleAckAnnouncement}
+                />
+              )}
+              {["Reports", "Project Analytics", "Employee Analytics", "Division Performance"].includes(activePage) && (
+                <AnalyticsPage page={activePage} workspace={workspace} user={user} onNotify={notify} />
+              )}
+              {activePage === "Roles & Permissions" && (
+                <RolesPermissionsPage
+                  workspace={workspace}
+                  user={user}
+                  onTogglePermission={(roleKey, perm) => {
+                    if (!canDo(user, "edit_role_matrix", workspace)) {
+                      notify("Only Founder Suyash Rathod can modify global RBAC permissions.");
+                      return;
+                    }
+                    updateWorkspace(
+                      (prev) => ({
+                        ...prev,
+                        roleMatrix: {
+                          ...prev.roleMatrix,
+                          [roleKey]: { ...prev.roleMatrix[roleKey], [perm]: !prev.roleMatrix[roleKey][perm] },
+                        },
+                      }),
+                      "rbac.updated",
+                      `Toggled ${perm} for ${roleKey}`,
+                    );
+                    notify("Role permission updated.");
+                  }}
+                />
+              )}
+              {activePage === "Company Settings" && (
+                <CompanySettingsPage
+                  workspace={workspace}
+                  onSaveSettings={(nextSettings) => {
+                    if (!canDo(user, "manage_settings", workspace)) {
+                      notify("Company settings are restricted to Founder.");
+                      return;
+                    }
+                    updateWorkspace(
+                      (prev) => ({ ...prev, settings: nextSettings }),
+                      "settings.saved",
+                      "Updated BeatsVibe workspace settings",
+                      "success",
+                    );
+                    notify("Company settings saved.");
+                  }}
+                  onResetWorkspace={() => {
+                    if (!canDo(user, "reset_workspace", workspace)) {
+                      notify("Workspace reset requires Founder authorization.");
+                      return;
+                    }
+                    const fresh = resetWorkspaceState();
+                    setWorkspace(fresh);
+                    notify("Workspace restored to initial sample state.");
+                  }}
+                  onNotify={notify}
+                />
+              )}
+              {activePage === "Security & Audit Logs" && (
+                <AuditLogsPage
+                  workspace={workspace}
+                  user={user}
+                  search={search}
+                  onNotify={notify}
+                  onClearAuditLogs={() => {
+                    if (!canDo(user, "clear_audit", workspace)) {
+                      notify("Trimming audit trail requires Founder authorization.");
+                      return;
+                    }
+                    updateWorkspace(
+                      (prev) => ({
+                        ...prev,
+                        auditLogs: [
+                          createAuditEntry(user, "audit.trimmed", "Founder trimmed older audit history", "info"),
+                          ...prev.auditLogs.slice(0, 10),
+                        ],
+                      }),
+                    );
+                    notify("Audit trail trimmed by Founder.");
+                  }}
+                />
+              )}
+              {activePage === "My Profile" && (
+                <ProfilePage key={user.id} user={user} onUpdateProfile={handleUpdateProfile} onNotify={notify} />
+              )}
+            </>
           )}
 
           <footer className="page-footer">
@@ -851,6 +1023,10 @@ function App() {
           onCreateDocument={handleCreateDocument}
           onDeleteDocument={handleDeleteDocument}
           onAddDivision={(div) => {
+            if (!canDo(user, "create_division", workspace)) {
+              notify("Adding new divisions is restricted to Founder.");
+              return;
+            }
             updateWorkspace(
               (prev) => ({ ...prev, divisions: [...prev.divisions, div] }),
               "division.created",
@@ -860,6 +1036,10 @@ function App() {
             notify(`Division "${div.name}" added.`);
           }}
           onAddDbmClient={(client) => {
+            if (!canDo(user, "manage_dbm_clients", workspace)) {
+              notify("Adding DBM clients requires DBM Lead, Admin, CTO, or Founder clearance.");
+              return;
+            }
             updateWorkspace(
               (prev) => ({ ...prev, dbmClients: [client, ...prev.dbmClients] }),
               "dbm.client_added",
@@ -883,11 +1063,38 @@ function Dashboard({ workspace, user, onOpenModal, onNavigate, onUpdateTask }) {
   );
   const completedTasks = workspace.tasks.filter((t) => t.status === "Done").length;
   const activeProjects = workspace.projects.filter((p) => p.status !== "Completed").length;
+  const roleTier = getRoleTier(user.role);
+  const founderMode = isFounder(user);
+  const visibleDivisions = workspace.divisions.filter((division) =>
+    canViewPage(user, pageForDivision(division.name), workspace),
+  );
+  const visibleActivity = ["owner", "cto", "admin"].includes(user.role)
+    ? workspace.auditLogs
+    : workspace.auditLogs.filter(
+      (log) => log.actorEmail?.toLowerCase() === user.email?.toLowerCase() || log.action === "workspace.initialized",
+    );
+
+  const quickButtons = [
+    canDo(user, "create_project", workspace)
+      ? { label: "New project", icon: FolderKanban, onClick: () => onOpenModal({ type: "Create Project" }) }
+      : { label: "My tasks", icon: ClipboardList, onClick: () => onNavigate("Tasks") },
+    canDo(user, "add_employee", workspace)
+      ? { label: "Add employee", icon: Users, onClick: () => onOpenModal({ type: "Add Employee" }) }
+      : { label: "Outlook mail", icon: Mail, onClick: () => onNavigate("Outlook") },
+    canDo(user, "schedule_event", workspace)
+      ? { label: "Meeting", icon: CalendarDays, onClick: () => onOpenModal({ type: "Schedule Meeting" }) }
+      : { label: "Meetings", icon: Users, onClick: () => onNavigate("Meetings") },
+    founderMode
+      ? { label: "New division", icon: Database, onClick: () => onOpenModal({ type: "Add Division" }) }
+      : canDo(user, "publish_announcement", workspace)
+        ? { label: "Announce", icon: Megaphone, onClick: () => onOpenModal({ type: "Publish Announcement" }) }
+        : { label: "My profile", icon: ShieldCheck, onClick: () => onNavigate("My Profile") },
+  ];
 
   const statusBreakdown = [
-    { name: "Completed", value: workspace.projects.filter((p) => ["Completed", "In review"].includes(p.status)).length || 2, color: "#2589df" },
-    { name: "In progress", value: workspace.projects.filter((p) => p.status === "In progress").length || 2, color: "#43bf91" },
-    { name: "Planning", value: workspace.projects.filter((p) => ["Planning", "On hold"].includes(p.status)).length || 1, color: "#f29b55" },
+    { name: "Completed", value: workspace.projects.filter((p) => ["Completed", "In review"].includes(p.status)).length || 2, color: "#0b66c3" },
+    { name: "In progress", value: workspace.projects.filter((p) => p.status === "In progress").length || 2, color: "#10b981" },
+    { name: "Planning", value: workspace.projects.filter((p) => ["Planning", "On hold"].includes(p.status)).length || 1, color: "#f59e0b" },
   ];
   const totalProjCount = statusBreakdown.reduce((s, i) => s + i.value, 0) || 1;
   const donePct = Math.round((statusBreakdown[0].value / totalProjCount) * 100);
@@ -906,43 +1113,89 @@ function Dashboard({ workspace, user, onOpenModal, onNavigate, onUpdateTask }) {
         <div className="welcome-content">
           <div className="eyebrow">
             {new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "2-digit", year: "numeric" }).format(new Date()).toUpperCase()}
-            <span className="live-pill"><i /> {formatRole(user.role).toUpperCase()} WORKSPACE</span>
+            <span className="live-pill"><i /> {roleTier.shortLabel.toUpperCase()}</span>
           </div>
           <h1>Welcome back, {user.displayName} <span className="wave">👋</span></h1>
-          <p>{user.jobTitle} · {user.division} — You have {myTasks.filter((t) => t.status !== "Done").length} active task(s) in your queue.</p>
+          <p>{user.jobTitle} · {user.division} — {roleTier.summary}</p>
           <div className="hero-actions">
             <button className="button button-primary hero-explore" onClick={() => onNavigate("Outlook")}>
               <Mail size={14} /> Open Outlook Mail
             </button>
             <button className="button button-white hero-explore" onClick={() => onNavigate("Tasks")}>
-              My Tasks <ArrowRight size={14} />
+              My Queue ({myTasks.filter((t) => t.status !== "Done").length}) <ArrowRight size={14} />
             </button>
+            {founderMode && (
+              <button className="button button-white hero-explore" onClick={() => onNavigate("Roles & Permissions")}>
+                <Crown size={14} color="#0a3d91" /> Governance Matrix
+              </button>
+            )}
           </div>
         </div>
         <div className="hero-demo-pill"><i /> {user.availability || "Available"}</div>
       </div>
 
+      {founderMode && (
+        <section className="card founder-command-strip">
+          <div className="founder-command-left">
+            <span className="founder-crown-badge"><Crown size={15} /> Founder Supreme Governance</span>
+            <p>Exclusive controls unlocked only for Suyash Rathod: RBAC editing, Company Settings, Payments &amp; Audit Export.</p>
+          </div>
+          <div className="founder-command-actions">
+            <button className="button button-outline btn-xs" onClick={() => onNavigate("Roles & Permissions")}>
+              <ShieldCheck size={13} /> Edit 7-Tier RBAC
+            </button>
+            <button className="button button-outline btn-xs" onClick={() => onNavigate("Company Settings")}>
+              <Settings size={13} /> System &amp; Reset
+            </button>
+            <button className="button button-outline btn-xs" onClick={() => onNavigate("BeatsVibe Payments")}>
+              <CreditCard size={13} /> Payments Spec
+            </button>
+            <button className="button button-primary btn-xs" onClick={() => onNavigate("Security & Audit Logs")}>
+              <LockKeyhole size={13} /> Export Audit Trail
+            </button>
+          </div>
+        </section>
+      )}
+
       <div className="dashboard-summary-row">
         <div className="stat-grid">
-          <StatCard title="Employees" value={workspace.employees.length} change={`${workspace.employees.filter((e) => e.status === "Active").length} active`} positive icon={Users} tone="blue" points="2,28 16,23 27,26 39,20 51,24 63,15 75,19 88,9 101,12 115,3" />
-          <StatCard title="Active projects" value={activeProjects} change={`${workspace.divisions.length} divisions`} positive icon={FolderKanban} tone="purple" points="2,27 14,21 27,24 39,14 51,19 64,10 77,15 90,5 102,9 115,1" />
-          <StatCard title="Completed tasks" value={completedTasks} change={`of ${workspace.tasks.length} total`} positive icon={CheckCheck} tone="green" points="2,27 14,25 27,18 39,22 51,12 64,16 77,8 90,13 103,5 115,2" />
-          <StatCard title="Upcoming events" value={workspace.events.length} change={workspace.events[0] ? `Next: ${workspace.events[0].day} ${workspace.events[0].month}` : ""} positive={false} icon={CalendarDays} tone="orange" points="2,29 14,25 27,27 39,20 51,23 64,16 77,18 90,10 103,12 115,3" />
+          {user.role === "intern" ? (
+            <>
+              <StatCard title="My assigned tasks" value={myTasks.length} change={`${myTasks.filter((t) => t.status === "Done").length} completed`} positive icon={ClipboardList} tone="blue" points="2,28 16,23 27,26 39,20 51,24 63,15 75,19 88,9 101,12 115,3" />
+              <StatCard title="Cohort projects" value={workspace.projects.filter((p) => p.division === "BeatsVibe Career" || p.division === "VedaIQ – Veda").length} change="Career & AI track" positive icon={FolderKanban} tone="purple" points="2,27 14,21 27,24 39,14 51,19 64,10 77,15 90,5 102,9 115,1" />
+              <StatCard title="Unread emails" value={workspace.emails.filter((m) => m.unread && m.folder === "inbox").length} change="Outlook inbox" positive icon={Mail} tone="green" points="2,27 14,25 27,18 39,22 51,12 64,16 77,8 90,13 103,5 115,2" />
+              <StatCard title="Upcoming sessions" value={workspace.events.length} change={workspace.events[0] ? `Next: ${workspace.events[0].day} ${workspace.events[0].month}` : ""} positive={false} icon={CalendarDays} tone="orange" points="2,29 14,25 27,27 39,20 51,23 64,16 77,18 90,10 103,12 115,3" />
+            </>
+          ) : (
+            <>
+              <StatCard title="Employees" value={workspace.employees.length} change={`${workspace.employees.filter((e) => e.status === "Active").length} active`} positive icon={Users} tone="blue" points="2,28 16,23 27,26 39,20 51,24 63,15 75,19 88,9 101,12 115,3" />
+              <StatCard title="Active projects" value={activeProjects} change={`${visibleDivisions.length} divisions`} positive icon={FolderKanban} tone="purple" points="2,27 14,21 27,24 39,14 51,19 64,10 77,15 90,5 102,9 115,1" />
+              <StatCard title="Completed tasks" value={completedTasks} change={`of ${workspace.tasks.length} total`} positive icon={CheckCheck} tone="green" points="2,27 14,25 27,18 39,22 51,12 64,16 77,8 90,13 103,5 115,2" />
+              <StatCard title="Upcoming events" value={workspace.events.length} change={workspace.events[0] ? `Next: ${workspace.events[0].day} ${workspace.events[0].month}` : ""} positive={false} icon={CalendarDays} tone="orange" points="2,29 14,25 27,27 39,20 51,23 64,16 77,18 90,10 103,12 115,3" />
+            </>
+          )}
         </div>
 
         <section className="card dashboard-quick-card">
           <div className="quick-card-heading">
-            <span><Zap size={15} fill="currentColor" /> Quick actions</span>
+            <span><Zap size={15} fill="currentColor" /> Role Actions ({roleTier.badge})</span>
             <button onClick={() => onOpenModal({ type: "More Quick Actions" })}>View all <ArrowRight size={12} /></button>
           </div>
           <div className="quick-grid">
-            <button className="quick-action" onClick={() => onOpenModal({ type: "Create Project" })}><span><FolderKanban size={16} /></span><strong>New project</strong></button>
-            <button className="quick-action" onClick={() => onOpenModal({ type: "Add Employee" })}><span><Users size={16} /></span><strong>Add employee</strong></button>
-            <button className="quick-action" onClick={() => onOpenModal({ type: "Schedule Meeting" })}><span><CalendarDays size={16} /></span><strong>Meeting</strong></button>
-            <button className="quick-action" onClick={() => onOpenModal({ type: "Publish Announcement" })}><span><Megaphone size={16} /></span><strong>Announce</strong></button>
+            {quickButtons.map((btn) => {
+              const Icon = btn.icon;
+              return (
+                <button key={btn.label} className="quick-action" onClick={btn.onClick}>
+                  <span><Icon size={16} /></span>
+                  <strong>{btn.label}</strong>
+                </button>
+              );
+            })}
           </div>
           <div className="quick-extra-actions">
-            <button onClick={() => onOpenModal({ type: "Assign Task" })}><ClipboardList size={13} /> Assign task</button>
+            {canDo(user, "assign_task", workspace) && (
+              <button onClick={() => onOpenModal({ type: "Assign Task" })}><ClipboardList size={13} /> Assign task</button>
+            )}
             <button onClick={() => onNavigate("Outlook")}><Mail size={13} /> Send Outlook mail</button>
           </div>
         </section>
@@ -951,11 +1204,13 @@ function Dashboard({ workspace, user, onOpenModal, onNavigate, onUpdateTask }) {
       <div className="dashboard-middle-grid">
         <section className="card dashboard-divisions">
           <div className="compact-card-heading">
-            <div><h2>Our Divisions</h2><p>Explore BeatsVibe teams &amp; live operations</p></div>
-            <button className="text-link" onClick={() => onNavigate("Divisions")}>Manage divisions <ArrowRight size={13} /></button>
+            <div><h2>{user.role === "intern" ? "Your Division Track" : "Our Divisions"}</h2><p>Authorized BeatsVibe teams &amp; operations</p></div>
+            {canViewPage(user, "Divisions", workspace) && (
+              <button className="text-link" onClick={() => onNavigate("Divisions")}>Explore <ArrowRight size={13} /></button>
+            )}
           </div>
           <div className="division-mini-grid">
-            {workspace.divisions.map((division) => (
+            {visibleDivisions.map((division) => (
               <DivisionCard
                 key={division.slug || division.name}
                 division={division}
@@ -969,7 +1224,9 @@ function Dashboard({ workspace, user, onOpenModal, onNavigate, onUpdateTask }) {
         <section className="card company-analytics-card">
           <div className="compact-card-heading">
             <div><h2>Project Health</h2><p>Overall delivery status</p></div>
-            <button className="select-button" onClick={() => onNavigate("Reports")}>Reports <ChevronDown size={12} /></button>
+            {canViewPage(user, "Reports", workspace) && (
+              <button className="select-button" onClick={() => onNavigate("Reports")}>Reports <ChevronDown size={12} /></button>
+            )}
           </div>
           <div className="analytics-summary">
             <div className="compact-donut">
@@ -1036,16 +1293,20 @@ function Dashboard({ workspace, user, onOpenModal, onNavigate, onUpdateTask }) {
                   <button onClick={() => onOpenModal({ type: "View Task", item: t })}>{t.name}</button>
                   <small>{t.project} · Due {t.due}</small>
                 </div>
-                <select
-                  className="inline-status-select"
-                  value={t.status}
-                  onChange={(e) => onUpdateTask(t.id, { status: e.target.value })}
-                >
-                  <option>To do</option>
-                  <option>In progress</option>
-                  <option>In review</option>
-                  <option>Done</option>
-                </select>
+                {canDo(user, "update_task", workspace, t) ? (
+                  <select
+                    className="inline-status-select"
+                    value={t.status}
+                    onChange={(e) => onUpdateTask(t.id, { status: e.target.value })}
+                  >
+                    <option>To do</option>
+                    <option>In progress</option>
+                    <option>In review</option>
+                    <option>Done</option>
+                  </select>
+                ) : (
+                  <span className="status-pill neutral"><i /> {t.status}</span>
+                )}
               </div>
             ))}
           </div>
@@ -1056,8 +1317,8 @@ function Dashboard({ workspace, user, onOpenModal, onNavigate, onUpdateTask }) {
           <div className="ecosystem-copy">
             <img src="/beatsvibe-logo.png" alt="BeatsVibe Technologies" className="ecosystem-brand-logo" />
             <strong>One corporate platform.<br />Every division aligned.</strong>
-            <p>Outlook · Projects · Divisions · Analytics</p>
-            <button className="button button-primary" onClick={() => onNavigate("Company Overview")}>
+            <p>Outlook · Projects · Divisions · 7-Tier RBAC</p>
+            <button className="button button-primary" onClick={() => onNavigate(canViewPage(user, "Company Overview", workspace) ? "Company Overview" : "Career & Internships")}>
               Explore our ecosystem <ArrowRight size={13} />
             </button>
           </div>
@@ -1066,18 +1327,20 @@ function Dashboard({ workspace, user, onOpenModal, onNavigate, onUpdateTask }) {
             <div className="ecosystem-card-stack">
               <div className="eco-mini-pill"><FolderKanban size={14} /> 6 Divisions</div>
               <div className="eco-mini-pill"><Mail size={14} /> Outlook Live</div>
-              <div className="eco-mini-pill"><ShieldCheck size={14} /> RBAC Security</div>
+              <div className="eco-mini-pill"><ShieldCheck size={14} /> 7-Tier RBAC</div>
             </div>
           </div>
         </section>
 
         <section className="card dashboard-activity-card">
           <div className="compact-card-heading">
-            <div><h2>Recent Activity</h2><p>Live audit feed</p></div>
-            <button className="text-link" onClick={() => onNavigate("Security & Audit Logs")}>Audit log <ArrowRight size={12} /></button>
+            <div><h2>Recent Activity</h2><p>{["owner", "cto", "admin"].includes(user.role) ? "Live audit feed" : "Your recent activity"}</p></div>
+            {canViewPage(user, "Security & Audit Logs", workspace) && (
+              <button className="text-link" onClick={() => onNavigate("Security & Audit Logs")}>Audit log <ArrowRight size={12} /></button>
+            )}
           </div>
           <div className="activity-list">
-            {workspace.auditLogs.slice(0, 4).map((log) => (
+            {visibleActivity.slice(0, 4).map((log) => (
               <div className="activity-item" key={log.id}>
                 <span className="avatar avatar-blue">{initialsFromName(log.actorName || log.actorEmail)}</span>
                 <div>
@@ -1141,7 +1404,7 @@ function Sparkline({ points, color, fill }) {
   );
 }
 
-function SearchResults({ query, workspace, onSelect }) {
+function SearchResults({ query, workspace, user, onSelect }) {
   const matches = useMemo(() => {
     const records = [
       ...navigation.flatMap((group) => group.items.map((item) => ({ title: item, detail: group.group, page: item }))),
@@ -1151,10 +1414,10 @@ function SearchResults({ query, workspace, onSelect }) {
       ...workspace.announcements.map((item) => ({ title: item.title, detail: "Announcement", page: "Announcements" })),
       ...workspace.documents.map((item) => ({ title: item.title, detail: "Document", page: "Documents" })),
       ...workspace.emails.map((item) => ({ title: item.subject, detail: `Outlook · ${item.fromName}`, page: "Outlook" })),
-    ];
+    ].filter((rec) => canViewPage(user, rec.page, workspace));
     const normalized = query.trim().toLowerCase();
     return records.filter((item) => `${item.title} ${item.detail}`.toLowerCase().includes(normalized)).slice(0, 8);
-  }, [query, workspace]);
+  }, [query, workspace, user]);
 
   return (
     <div className="search-results">

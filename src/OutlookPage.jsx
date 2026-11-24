@@ -3,8 +3,9 @@ import {
   Archive, CheckCheck, Inbox, Mail, MailOpen, Plus, Reply, Search, Send, Star, Trash2, X,
 } from "lucide-react";
 import { initialsFromName } from "./workspaceStore.js";
+import { canDo } from "./permissions.js";
 
-export function OutlookPage({ user, employees, emails, onSendEmail, onUpdateEmail, onDeleteEmail, onNotify }) {
+export function OutlookPage({ user, workspace, employees, emails, onSendEmail, onUpdateEmail, onDeleteEmail, onNotify }) {
   const [folder, setFolder] = useState("inbox");
   const [query, setQuery] = useState("");
   const [mailFilter, setMailFilter] = useState("all");
@@ -14,6 +15,8 @@ export function OutlookPage({ user, employees, emails, onSendEmail, onUpdateEmai
   const [composeForm, setComposeForm] = useState({ toEmail: "", subject: "", body: "", tag: "General" });
 
   const myEmail = user?.email?.toLowerCase() || "";
+  const canBroadcast = canDo(user, "broadcast_email", workspace);
+  const canDeleteMail = canDo(user, "delete_email", workspace);
 
   const isInboxRecipient = (mail) => {
     const to = mail.toEmail?.toLowerCase() || "";
@@ -62,6 +65,10 @@ export function OutlookPage({ user, employees, emails, onSendEmail, onUpdateEmai
     event.preventDefault();
     if (!composeForm.toEmail.trim() || !composeForm.subject.trim()) {
       onNotify("Enter a recipient email and subject.");
+      return;
+    }
+    if (!canBroadcast && composeForm.toEmail.trim().toLowerCase() === "all@beatsvibe.com") {
+      onNotify("Company-wide broadcast (all@beatsvibe.com) is restricted to Leads, HR, Admin, CTO, and Founder.");
       return;
     }
     onSendEmail({
@@ -259,20 +266,22 @@ export function OutlookPage({ user, employees, emails, onSendEmail, onUpdateEmai
                     <Archive size={14} /> Archive
                   </button>
                 )}
-                <button
-                  className="button button-danger btn-xs"
-                  onClick={() => {
-                    if (activeMail.folder === "trash") {
-                      onDeleteEmail(activeMail.id);
-                      onNotify("Email permanently deleted.");
-                    } else {
-                      onUpdateEmail(activeMail.id, { folder: "trash" });
-                      onNotify("Email moved to Trash.");
-                    }
-                  }}
-                >
-                  <Trash2 size={14} /> {activeMail.folder === "trash" ? "Delete forever" : "Delete"}
-                </button>
+                {canDeleteMail && (
+                  <button
+                    className="button button-danger btn-xs"
+                    onClick={() => {
+                      if (activeMail.folder === "trash") {
+                        onDeleteEmail(activeMail.id);
+                        onNotify("Email permanently deleted.");
+                      } else {
+                        onUpdateEmail(activeMail.id, { folder: "trash" });
+                        onNotify("Email moved to Trash.");
+                      }
+                    }}
+                  >
+                    <Trash2 size={14} /> {activeMail.folder === "trash" ? "Delete forever" : "Delete"}
+                  </button>
+                )}
               </div>
 
               <div className="outlook-reader-body">
@@ -349,7 +358,7 @@ export function OutlookPage({ user, employees, emails, onSendEmail, onUpdateEmai
                   placeholder="Select colleague or type email (e.g. employee@beatsvibe.com)"
                 />
                 <datalist id="beatsvibe-colleagues">
-                  <option value="all@beatsvibe.com">All BeatsVibe Employees</option>
+                  {canBroadcast && <option value="all@beatsvibe.com">All BeatsVibe Employees</option>}
                   {employees.map((emp) => (
                     <option key={emp.id} value={emp.email}>{emp.name} ({emp.role})</option>
                   ))}

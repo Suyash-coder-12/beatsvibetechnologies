@@ -14,8 +14,8 @@ import {
   taskRows,
 } from "./data.js";
 
-const STORAGE_KEY = "beatsvibe_one_workspace_v5";
-const SESSION_KEY = "beatsvibe_one_active_session_v5";
+const STORAGE_KEY = "beatsvibe_one_workspace_v6";
+const SESSION_KEY = "beatsvibe_one_active_session_v6";
 
 export function getInitialWorkspaceState() {
   return {
@@ -46,7 +46,12 @@ export function loadWorkspaceState() {
       ...base,
       ...parsed,
       settings: { ...base.settings, ...(parsed.settings || {}) },
-      roleMatrix: { ...base.roleMatrix, ...(parsed.roleMatrix || {}) },
+      roleMatrix: Object.fromEntries(
+        Object.entries(base.roleMatrix).map(([roleKey, roleDefaults]) => [
+          roleKey,
+          { ...roleDefaults, ...(parsed.roleMatrix?.[roleKey] || {}) },
+        ]),
+      ),
     };
   } catch {
     return getInitialWorkspaceState();
@@ -94,10 +99,10 @@ export function authenticateLocalUser(employees, email, password) {
     (emp) => emp.email?.toLowerCase() === normalized && emp.isActive !== false && emp.status !== "Inactive",
   );
   if (!account) {
-    return { ok: false, error: "Account not found or inactive. Use one of the BeatsVibe employee IDs below." };
+    return { ok: false, error: "Account not found or inactive. Verify your BeatsVibe One login ID." };
   }
   if (account.password && account.password !== password) {
-    return { ok: false, error: "Incorrect password for this account. Check the employee credentials list." };
+    return { ok: false, error: "Incorrect password for this account. Contact the Founder or Admin for a reset." };
   }
   return { ok: true, user: toWorkspaceUser(account) };
 }

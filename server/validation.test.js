@@ -29,9 +29,17 @@ test("profile updates accept only supported personal fields", () => {
 
 test("roles have least-privilege user and employee permissions", () => {
   assert.equal(hasPermission("owner", "users:write"), true);
+  assert.equal(hasPermission("owner", "settings:write"), true);
+  assert.equal(hasPermission("owner", "roles:write"), true);
+  assert.equal(hasPermission("owner", "payments:write"), true);
+  assert.equal(hasPermission("cto", "users:write"), false);
+  assert.equal(hasPermission("cto", "settings:write"), false);
+  assert.equal(hasPermission("cto", "projects:write"), true);
   assert.equal(hasPermission("admin", "users:write"), false);
+  assert.equal(hasPermission("admin", "announcements:write"), false);
   assert.equal(hasPermission("hr", "employees:write"), true);
   assert.equal(hasPermission("employee", "employees:read"), false);
+  assert.equal(hasPermission("employee", "tasks:update_own"), true);
   assert.equal(hasPermission("intern", "projects:write"), false);
   assert.equal(hasPermission("intern", "profile:write"), true);
 });

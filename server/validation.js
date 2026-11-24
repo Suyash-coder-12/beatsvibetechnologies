@@ -42,7 +42,7 @@ export const announcementSchema = z.object({
 export const userSchema = z.object({
   email: z.email().max(254),
   password: passwordSchema,
-  role: z.enum(["admin", "hr", "team_leader", "employee", "intern"]),
+  role: z.enum(["cto", "admin", "hr", "team_leader", "employee", "intern"]),
 }).strict();
 
 export const profileSchema = z.object({

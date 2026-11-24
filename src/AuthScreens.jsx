@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, Eye, EyeOff, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Laptop, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
 
 export function LoadingScreen() {
   return (
@@ -47,13 +47,21 @@ export function LoginScreen({ onLogin, error, busy }) {
   return (
     <main className="auth-page">
       <section className="auth-card auth-single-card">
+        <div className="auth-top-accent" aria-hidden="true" />
         <div className="auth-brand">
           <img className="auth-brand-logo" src="/beatsvibe-logo.png" alt="BeatsVibe Technologies" />
-          <span className="auth-platform">ONE</span>
+          <span className="auth-platform">ONE · SUITE</span>
         </div>
-        <div className="auth-icon"><LockKeyhole size={22} /></div>
-        <h1>Sign in to your workspace</h1>
-        <p>Enter your BeatsVibe One ID and password to access your workspace.</p>
+
+        <div className="auth-heading-block">
+          <div className="auth-icon"><LockKeyhole size={20} /></div>
+          <div>
+            <span className="auth-eyebrow">ENTERPRISE WORKSPACE PORTAL</span>
+            <h1>Sign in to BeatsVibe One</h1>
+          </div>
+        </div>
+        <p>Authenticate with your official ID and password. Permissions adapt automatically across all 7 corporate tiers.</p>
+
         <form onSubmit={submit}>
           <label>
             Work email ID
@@ -91,11 +99,16 @@ export function LoginScreen({ onLogin, error, busy }) {
           </label>
           {error && <div className="auth-error" role="alert">{error}</div>}
           <button className="auth-submit" type="submit" disabled={busy}>
-            {busy ? "Signing in…" : "Sign in"} <ArrowRight size={15} />
+            {busy ? "Verifying session…" : "Access Workspace"} <ArrowRight size={15} />
           </button>
         </form>
+
+        <div className="auth-trust-strip">
+          <span><ShieldCheck size={13} /> 7-Tier RBAC Enforced</span>
+          <span><Laptop size={13} /> Workstation Guarded</span>
+        </div>
         <div className="auth-security-note">
-          <ShieldCheck size={14} /> BeatsVibe Technologies · Role-Based Access Control
+          BeatsVibe Technologies · Founder: Suyash Rathod · CTO: Pavan Londhe
         </div>
       </section>
     </main>

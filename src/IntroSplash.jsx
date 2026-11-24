@@ -38,7 +38,7 @@ export function IntroSplash({ onFinish }) {
 
           <div className="splash-subtitle-row">
             <span className="splash-one-pill">ONE</span>
-            <span className="splash-sub-copy">ENTERPRISE WORKSPACE</span>
+            <span className="splash-sub-copy">EXECUTIVE WORKSPACE SUITE</span>
           </div>
         </div>
 
@@ -47,7 +47,7 @@ export function IntroSplash({ onFinish }) {
             <div className="splash-progress-bar" />
           </div>
           <div className="splash-status-text">
-            {phase === "enter" ? "Verifying workstation & loading workspace…" : "Ready"}
+            {phase === "enter" ? "Securing workstation · Loading 7-tier RBAC environment…" : "Workspace Ready"}
           </div>
         </div>
       </div>
